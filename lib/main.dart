@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'profile_page.dart';
+import 'disease_detection.dart'; // Import Disease Detection Page
 
 void main() {
   runApp(const FarmersApp());
@@ -30,24 +31,23 @@ class HomePage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Farmers Hub', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('Farmers Hub',
+            style: TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: Colors.blue[700],
         centerTitle: true,
         elevation: 4,
       ),
       body: Stack(
         children: [
-        Opacity(
-  opacity: 0.4,
-  child: Image.asset(
-    'assets/images.jpg',
-    fit: BoxFit.cover,
-    width: double.infinity,
-    height: double.infinity,
-  ),
-),
-
-
+          Opacity(
+            opacity: 0.4,
+            child: Image.asset(
+              'assets/images.jpg',
+              fit: BoxFit.cover,
+              width: double.infinity,
+              height: double.infinity,
+            ),
+          ),
           SingleChildScrollView(
             child: Padding(
               padding: const EdgeInsets.all(16.0),
@@ -58,9 +58,15 @@ class HomePage extends StatelessWidget {
                   const SizedBox(height: 20),
                   _buildQuickActions(),
                   const SizedBox(height: 20),
-                  _buildInfoCard("🌱 Sustainable Farming", "Explore tips for eco-friendly farming practices.", Colors.green),
+                  _buildInfoCard(
+                      "🌱 Sustainable Farming",
+                      "Explore tips for eco-friendly farming practices.",
+                      Colors.green),
                   const SizedBox(height: 10),
-                  _buildInfoCard("💡 Smart Techniques", "Learn about the latest innovations in agriculture.", Colors.yellow[700]!),
+                  _buildInfoCard(
+                      "💡 Smart Techniques",
+                      "Learn about the latest innovations in agriculture.",
+                      Colors.yellow[700]!),
                 ],
               ),
             ),
@@ -71,10 +77,22 @@ class HomePage extends StatelessWidget {
         selectedItemColor: Colors.blue[700],
         unselectedItemColor: Colors.grey,
         showUnselectedLabels: true,
+        type: BottomNavigationBarType.fixed, // Ensures equal spacing
+        onTap: (index) {
+          if (index == 3) { // When "Disease" is clicked
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const DiseaseDetectionPage()),
+            );
+          }
+        },
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
-          BottomNavigationBarItem(icon: Icon(Icons.shopping_basket), label: "Market"),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.shopping_basket), label: "Market"),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile"),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.local_hospital), label: "Disease"),
         ],
       ),
     );
@@ -86,7 +104,9 @@ class HomePage extends StatelessWidget {
       decoration: BoxDecoration(
         gradient: const LinearGradient(colors: [Colors.blue, Colors.green]),
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.blue.withOpacity(0.2), blurRadius: 8)],
+        boxShadow: [
+          BoxShadow(color: Colors.blue.withOpacity(0.2), blurRadius: 8)
+        ],
       ),
       child: const Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -94,8 +114,13 @@ class HomePage extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text("Today's Weather", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
-              Text("☀️  28°C  |  Clear Sky", style: TextStyle(fontSize: 16, color: Colors.white70)),
+              Text("Today's Weather",
+                  style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white)),
+              Text("☀️  28°C  |  Clear Sky",
+                  style: TextStyle(fontSize: 16, color: Colors.white70)),
             ],
           ),
           Icon(Icons.wb_sunny, size: 40, color: Colors.yellowAccent),
@@ -108,14 +133,17 @@ class HomePage extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text("Quick Actions", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        const Text("Quick Actions",
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         const SizedBox(height: 10),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
-            _buildActionButton(Icons.shopping_cart, "Market Prices", Colors.red),
+            _buildActionButton(
+                Icons.shopping_cart, "Market Prices", Colors.red),
             _buildActionButton(Icons.cloud, "Weather", Colors.blue),
-            _buildActionButton(Icons.lightbulb, "Farming Advice", Colors.yellow[800]!),
+            _buildActionButton(
+                Icons.lightbulb, "Farming Advice", Colors.yellow[800]!),
           ],
         ),
       ],
@@ -147,9 +175,12 @@ class HomePage extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: color)),
+          Text(title,
+              style: TextStyle(
+                  fontSize: 16, fontWeight: FontWeight.bold, color: color)),
           const SizedBox(height: 5),
-          Text(description, style: TextStyle(fontSize: 14, color: Colors.black87)),
+          Text(description,
+              style: TextStyle(fontSize: 14, color: Colors.black87)),
         ],
       ),
     );

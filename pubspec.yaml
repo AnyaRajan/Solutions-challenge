@@ -33,13 +33,16 @@ dependencies:
   geolocator: ^13.0.2
   http: ^1.3.0
   flutter_dotenv: ^5.2.1
+  cupertino_icons: ^1.0.2
+  image_picker: ^0.8.9
+  flutter_tflite: ^1.0.1
 
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
-  cupertino_icons: ^1.0.8
+  # cupertino_icons: ^1.0.8
   google_fonts: ^6.2.1
-  image_picker: ^1.1.2
+  # image_picker: ^1.1.2
   shared_preferences: ^2.5.2
 
 dev_dependencies:
@@ -56,16 +59,17 @@ dev_dependencies:
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
 
+# The following section is specific to Flutter packages.
 flutter:
+
+  # The following line ensures that the Material Icons font is
+  # included with your application, so that you can use the icons in
+  # the material Icons class.
   uses-material-design: true
-  assets:
-    - assets/images.jpg
 
-
-    # - assets/images.png
   # To add assets to your application, add an assets section, like this:
   assets:
-    - .env
+    - assets/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
@@ -92,5 +96,3 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
-
-  
