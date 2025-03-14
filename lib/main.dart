@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'profile_page.dart';
 
 void main() {
   runApp(FarmersApp());
@@ -79,6 +80,15 @@ class HomePage extends StatelessWidget {
       bottomNavigationBar: BottomNavigationBar(
         selectedItemColor: Colors.green[700],
         unselectedItemColor: Colors.grey,
+        currentIndex: 0, 
+        onTap: (index) {
+          if (index == 2) { // profile page access
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => ProfilePage()),
+            );
+          }
+        },
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
           BottomNavigationBarItem(icon: Icon(Icons.shopping_basket), label: "Market"),
