@@ -6,15 +6,15 @@ class ChatbotPage extends StatefulWidget {
   const ChatbotPage({super.key});
 
   @override
-  _ChatbotPageState createState() => _ChatbotPageState();
+  State<ChatbotPage> createState() => _ChatbotPageState();
 }
 
 class _ChatbotPageState extends State<ChatbotPage> {
   final TextEditingController _controller = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
   final List<Map<String, String>> _messages = [];
   late GenerativeModel _model;
   bool _isLoading = false;
-  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
@@ -23,42 +23,35 @@ class _ChatbotPageState extends State<ChatbotPage> {
   }
 
   void _initializeGemini() {
-    String? apiKey = dotenv.env['GEMINI_API_KEY'];
+    final apiKey = dotenv.env['GEMINI_API_KEY'];
     if (apiKey == null || apiKey.isEmpty) {
-      throw Exception("GEMINI_API_KEY is missing from .env file");
+      throw Exception('Missing GEMINI_API_KEY in .env');
     }
 
-    _model = GenerativeModel(
-      model: 'gemini-pro',
-      apiKey: apiKey,
-    );
+    _model = GenerativeModel(model: 'gemini-2.0-flash', apiKey: apiKey);
   }
 
   Future<void> _sendMessage() async {
-    String userMessage = _controller.text.trim();
-    if (userMessage.isEmpty) return;
+    final userText = _controller.text.trim();
+    if (userText.isEmpty) return;
 
     setState(() {
-      _messages.add({"role": "user", "message": userMessage});
+      _messages.add({'role': 'user', 'text': userText});
       _controller.clear();
       _isLoading = true;
     });
-
     _scrollToBottom();
 
     try {
-      final response =
-          await _model.generateContent([Content.text(userMessage)]);
-      String botResponse = response.text ?? "Sorry, I couldn't understand.";
+      final response = await _model.generateContent([Content.text(userText)]);
+      final reply = response.text ?? "Sorry, I didn't understand.";
 
       setState(() {
-        _messages.add({"role": "bot", "message": botResponse});
+        _messages.add({'role': 'bot', 'text': reply});
       });
     } catch (e) {
-      print(e);
       setState(() {
-        _messages.add(
-            {"role": "bot", "message": "Error: Unable to fetch response."});
+        _messages.add({'role': 'bot', 'text': '⚠️ Error: ${e.toString()}'});
       });
     }
 
@@ -71,88 +64,73 @@ class _ChatbotPageState extends State<ChatbotPage> {
 
   void _scrollToBottom() {
     Future.delayed(const Duration(milliseconds: 300), () {
-      _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOut,
-      );
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
     });
+  }
+
+  Widget _buildBubble(String text, bool isUser) {
+    return Align(
+      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+        padding: const EdgeInsets.all(14),
+        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: isUser
+                ? [Colors.blue, Colors.lightBlueAccent]
+                : [Colors.grey.shade700, Colors.grey.shade600],
+          ),
+          borderRadius: BorderRadius.only(
+            topLeft: const Radius.circular(16),
+            topRight: const Radius.circular(16),
+            bottomLeft: isUser ? const Radius.circular(16) : const Radius.circular(0),
+            bottomRight: isUser ? const Radius.circular(0) : const Radius.circular(16),
+          ),
+        ),
+        child: Text(text, style: const TextStyle(color: Colors.white)),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Chat-bot 🤖 "),
-        backgroundColor: Colors.blue[700],
+        title: const Text('Gemini Chat 🤖'),
         centerTitle: true,
+        backgroundColor: Colors.blueAccent,
       ),
       body: Stack(
         children: [
           Positioned.fill(
-            child: Image.asset(
-              'assets/images.jpg',
-              fit: BoxFit.cover,
-            ),
+            child: Image.asset('assets/images.jpg', fit: BoxFit.cover),
           ),
           Column(
             children: [
               Expanded(
                 child: ListView.builder(
                   controller: _scrollController,
-                  padding: const EdgeInsets.all(12.0),
                   itemCount: _messages.length,
                   itemBuilder: (context, index) {
-                    final message = _messages[index];
-                    final isUser = message["role"] == "user";
-                    return Align(
-                      alignment:
-                          isUser ? Alignment.centerRight : Alignment.centerLeft,
-                      child: Container(
-                        padding: const EdgeInsets.all(14),
-                        margin: const EdgeInsets.symmetric(vertical: 6),
-                        constraints: BoxConstraints(
-                            maxWidth: MediaQuery.of(context).size.width * 0.7),
-                        decoration: BoxDecoration(
-                          gradient: isUser
-                              ? const LinearGradient(
-                                  colors: [Colors.blue, Colors.lightBlueAccent])
-                              : const LinearGradient(
-                                  colors: [Colors.grey, Colors.white70]),
-                          borderRadius: BorderRadius.only(
-                            topLeft: const Radius.circular(16),
-                            topRight: const Radius.circular(16),
-                            bottomLeft: isUser
-                                ? const Radius.circular(16)
-                                : const Radius.circular(0),
-                            bottomRight: isUser
-                                ? const Radius.circular(0)
-                                : const Radius.circular(16),
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.1),
-                              blurRadius: 5,
-                            ),
-                          ],
-                        ),
-                        child: Text(
-                          message["message"]!,
-                          style: const TextStyle(
-                              fontSize: 16, color: Colors.white),
-                        ),
-                      ),
-                    );
+                    final msg = _messages[index];
+                    return _buildBubble(msg['text']!, msg['role'] == 'user');
                   },
                 ),
               ),
               if (_isLoading)
                 const Padding(
-                  padding: EdgeInsets.all(8.0),
-                  child: CircularProgressIndicator(color: Colors.blue),
+                  padding: EdgeInsets.all(8),
+                  child: CircularProgressIndicator(),
                 ),
               Padding(
-                padding: const EdgeInsets.all(8.0),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
                 child: Row(
                   children: [
                     Expanded(
@@ -160,7 +138,7 @@ class _ChatbotPageState extends State<ChatbotPage> {
                         controller: _controller,
                         style: const TextStyle(color: Colors.white),
                         decoration: InputDecoration(
-                          hintText: "Ask me anything...",
+                          hintText: 'Ask something...',
                           hintStyle: const TextStyle(color: Colors.white70),
                           filled: true,
                           fillColor: Colors.black.withOpacity(0.3),
@@ -169,6 +147,7 @@ class _ChatbotPageState extends State<ChatbotPage> {
                             borderSide: BorderSide.none,
                           ),
                         ),
+                        onSubmitted: (_) => _sendMessage(),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -179,7 +158,7 @@ class _ChatbotPageState extends State<ChatbotPage> {
                         backgroundColor: Colors.blueAccent,
                         child: const Icon(Icons.send, color: Colors.white),
                       ),
-                    ),
+                    )
                   ],
                 ),
               ),
