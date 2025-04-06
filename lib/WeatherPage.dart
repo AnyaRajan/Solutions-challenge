@@ -4,25 +4,6 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
-Future<void> main() async{
-  await dotenv.load(fileName: ".env");
-  runApp(WeatherApp());
-}
-
-class WeatherApp extends StatelessWidget {
-  const WeatherApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Weather App',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-      ),
-      home: WeatherScreen(),
-    );
-  }
-}
 
 class WeatherScreen extends StatefulWidget {
   const WeatherScreen({super.key});
@@ -37,54 +18,47 @@ class _WeatherScreenState extends State<WeatherScreen> {
   Map<String, dynamic>? weatherData;
   String? error;
   bool isLoading = false;
+  bool locationDenied = false;
   String lang = 'en-us'; // language can be selected during registration
 
   @override
   void initState() {
     super.initState();
-    _getWeatherData();
+    _checkLocationAndFetch();
+  }
+
+  Future<void> _checkLocationAndFetch() async {
+    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      setState(() => locationDenied = true);
+      return;
+    }
+    await _getWeatherData();
   }
 
   Future<void> _getWeatherData() async {
     setState(() {
       isLoading = true;
       error = null;
+      locationDenied = false;
     });
 
     try {
-      // Getting device location
       final position = await _getCurrentLocation();
-
-      // 2. Get location key from AccuWeather
-      if (position == null) {
-        throw "unable to get position";
-      }
-
       locationKey = await _getLocationKey(position);
-
-      // 3. Get weather forecast
-      if (locationKey == null) {
-        throw "unable to get locationKey.";
-      }
-
       weatherData = await _getWeatherForecast(locationKey!);
     } catch (e) {
-      setState(() {
-        error = e.toString();
-      });
+      if (mounted) {
+    setState(() => error = e.toString());
+  }
     } finally {
-      setState(() {
-        isLoading = false;
-      });
+      if (mounted) {
+    setState(() => isLoading = false);
+  }
     }
   }
 
   Future<Position> _getCurrentLocation() async {
-    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      throw 'Location services are disabled';
-    }
-
     LocationPermission permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
@@ -129,73 +103,204 @@ class _WeatherScreenState extends State<WeatherScreen> {
       throw 'Failed to get weather forecast: ${response.statusCode}';
     }
   }
+  Future<void> _openLocationSettings() async {
+    await Geolocator.openLocationSettings();
+    await _checkLocationAndFetch();
+  }
 
   @override
   Widget build(BuildContext context) {
-    if (weatherData == null && isLoading) {
-      return const CircularProgressIndicator();
-    }
-
-    if (weatherData == null && !isLoading) {
-      return Scaffold(
-        appBar: AppBar(
-          title: const Text('Weather Forecast'),
-        ),
-        body: Center(
-          child: Text("Unable to get Weather data",
-              style: const TextStyle(fontSize: 20, color: Colors.amber)),
-        ),
-      );
-    }
-    ;
-    List dailyForecasts = weatherData!['DailyForecasts'];
     return Scaffold(
       appBar: AppBar(
         title: const Text('Weather Forecast'),
-      ),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: ListView(
-            children: dailyForecasts
-                .map<Widget>((dailyForecast) => _buildContent(dailyForecast))
-                .toList(),
+        centerTitle: true,
+        backgroundColor: Colors.blue[800],
+        foregroundColor: Colors.white,
+        elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _getWeatherData,
           ),
-        ),
+        ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _getWeatherData,
-        child: const Icon(Icons.refresh),
+      body: _buildBody(),
+      backgroundColor: Colors.blue[50],
+    );
+  }
+
+  Widget _buildBody() {
+    if (locationDenied) {
+      return _buildLocationDeniedView();
+    }
+
+    if (isLoading) {
+      return const Center(child: WeatherLoadingIndicator());
+    }
+
+    if (error != null) {
+      return WeatherErrorView(error: error!, onRetry: _getWeatherData);
+    }
+
+    if (weatherData == null) {
+      return const Center(child: Text('No weather data available'));
+    }
+
+    return _buildWeatherContent();
+  }
+
+  Widget _buildLocationDeniedView() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.location_off, size: 80, color: Colors.orange),
+            const SizedBox(height: 20),
+            Text(
+              'Location Services Disabled',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Colors.blue[900],
+              ),
+            ),
+            const SizedBox(height: 15),
+            const Text(
+              'We need your location to provide accurate weather forecasts',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 16),
+            ),
+            const SizedBox(height: 30),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.location_on, color: Colors.white,),
+              label: const Text('Enable Location', style: TextStyle(color: Colors.white),),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue[700],
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 30, vertical: 15),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(30),
+                ),
+              ),
+              onPressed: _openLocationSettings,
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildContent(Map<String, dynamic> dailyForecast) {
-    if (isLoading) {
-      return const CircularProgressIndicator();
-    }
+  Widget _buildWeatherContent() {
+    final dailyForecasts = weatherData!['DailyForecasts'];
+    return RefreshIndicator(
+      onRefresh: _getWeatherData,
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          const SizedBox(height: 10),
+          ...dailyForecasts.map<Widget>(
+            (dailyForecast) => Padding(
+              padding: const EdgeInsets.only(bottom: 20),
+              child: DailyWeatherCard(
+                temperature: dailyForecast['Temperature'],
+                day: dailyForecast['Day'],
+                night: dailyForecast['Night'],
+                date: dailyForecast['Date'],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
-    if (error != null) {
-      return Text(
-        'Error: $error',
-        style: const TextStyle(color: Color.fromARGB(255, 90, 246, 140)),
-      );
-    }
+class WeatherLoadingIndicator extends StatelessWidget {
+  const WeatherLoadingIndicator({super.key});
 
-    if (weatherData == null) {
-      return const Text('No weather data available');
-    }
-    final date = dailyForecast['Date'];
-    final temperature = dailyForecast['Temperature'];
-    final day = dailyForecast['Day'];
-    final night = dailyForecast['Night'];
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const CircularProgressIndicator(
+          strokeWidth: 5,
+          valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+        ),
+        const SizedBox(height: 20),
+        Text(
+          'Fetching Weather Data...',
+          style: TextStyle(
+            fontSize: 18,
+            color: Colors.blue[800],
+          ),
+        ),
+      ],
+    );
+  }
+}
 
-    return DailyWeatherCard(
-        temperature: temperature, day: day, night: night, date: date);
+class WeatherErrorView extends StatelessWidget {
+  final String error;
+  final VoidCallback onRetry;
+
+  const WeatherErrorView({
+    super.key,
+    required this.error,
+    required this.onRetry,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, size: 80, color: Colors.red),
+            const SizedBox(height: 20),
+            Text(
+              'Error Occurred',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Colors.blue[900],
+              ),
+            ),
+            const SizedBox(height: 15),
+            Text(
+              error,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 16),
+            ),
+            const SizedBox(height: 30),
+            ElevatedButton(
+              onPressed: onRetry,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue[700],
+                padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(30),
+                ),
+              ),
+              child: const Text('Try Again'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
 class DailyWeatherCard extends StatelessWidget {
+  final dynamic temperature;
+  final dynamic day;
+  final dynamic night;
+  final String date;
+
   const DailyWeatherCard({
     super.key,
     required this.temperature,
@@ -204,132 +309,85 @@ class DailyWeatherCard extends StatelessWidget {
     required this.date,
   });
 
-  final temperature;
-  final day;
-  final night;
-  final date;
-
-  List get dateSimplified => date.split('T')[0].split('-').toList();
+  List<String> get formattedDate => date.split('T')[0].split('-');
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.7,
+    return Card(
+      elevation: 5,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Colors.blue[400]!, Colors.blue[800]!],
+          ),
+          borderRadius: BorderRadius.circular(20),
         ),
         child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Container(
-            margin: const EdgeInsets.only(bottom: 16),
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Colors.blue.shade400, Colors.blue.shade900],
-              ),
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.2),
-                  blurRadius: 10,
-                  offset: const Offset(0, 5),
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            children: [
+              // Date
+              Text(
+                '${formattedDate[2]}/${formattedDate[1]}/${formattedDate[0]}',
+                style: const TextStyle(
+                  fontSize: 18,
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
                 ),
-              ],
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Date Display
-                Container(
-                  margin: const EdgeInsets.only(bottom: 15),
-                  padding:
-                      const EdgeInsets.symmetric(vertical: 10, horizontal: 20),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    "${dateSimplified[2]} - ${dateSimplified[1]} - ${dateSimplified[0]}",
+              ),
+              const SizedBox(height: 15),
+              
+              // Temperature
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.thermostat, color: Colors.white, size: 30),
+                  const SizedBox(width: 10),
+                  Text(
+                    '${temperature['Minimum']['Value'].round()}° - '
+                    '${temperature['Maximum']['Value'].round()}°',
                     style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w500,
+                      fontSize: 24,
                       color: Colors.white,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                ),
-
-                // Temperature Display
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(vertical: 15, horizontal: 25),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(15),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(
-                        Icons.thermostat,
-                        color: Colors.white,
-                        size: 32,
-                      ),
-                      const SizedBox(width: 10),
-                      Text(
-                        '${temperature['Minimum']['Value'].round()}°${temperature['Minimum']['Unit']} - '
-                        '${temperature['Maximum']['Value'].round()}°${temperature['Minimum']['Unit']}',
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 25),
-
-                // Day Weather
-                _buildWeatherInfo(
-                  title: 'Day',
-                  description: day['IconPhrase'],
-                  icon: Icons.wb_sunny,
-                ),
-
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 10),
-                  child: Divider(color: Colors.white30, thickness: 1),
-                ),
-
-                // Night Weather
-                _buildWeatherInfo(
-                  title: 'Night',
-                  description: night['IconPhrase'],
-                  icon: Icons.nightlight_round,
-                ),
-              ],
-            ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              
+              // Day/Night Info
+              _buildWeatherSection(
+                icon: Icons.wb_sunny,
+                title: 'Day',
+                description: day['IconPhrase'],
+              ),
+              const Divider(color: Colors.white54, height: 30),
+              _buildWeatherSection(
+                icon: Icons.nightlight_round,
+                title: 'Night',
+                description: night['IconPhrase'],
+              ),
+            ],
           ),
         ),
       ),
     );
   }
 
-  Widget _buildWeatherInfo({
+  Widget _buildWeatherSection({
+    required IconData icon,
     required String title,
     required String description,
-    required IconData icon,
   }) {
     return Row(
       children: [
-        Icon(
-          icon,
-          color: Colors.white,
-          size: 28,
-        ),
+        Icon(icon, color: Colors.white, size: 30),
         const SizedBox(width: 15),
         Expanded(
           child: Column(
@@ -340,10 +398,8 @@ class DailyWeatherCard extends StatelessWidget {
                 style: const TextStyle(
                   fontSize: 16,
                   color: Colors.white70,
-                  fontWeight: FontWeight.w500,
                 ),
               ),
-              const SizedBox(height: 4),
               Text(
                 description,
                 style: const TextStyle(
@@ -351,8 +407,6 @@ class DailyWeatherCard extends StatelessWidget {
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
                 ),
-                overflow: TextOverflow.ellipsis,
-                maxLines: 2,
               ),
             ],
           ),

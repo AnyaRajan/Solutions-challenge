@@ -1,17 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:camera/camera.dart';
 import 'profile_page.dart';
 import 'chatbot.dart';
+import 'soilDisease.dart'; 
+import 'WeatherPage.dart';
+import 'SoilEvalPage.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  final cameras = await availableCameras();
   await dotenv.load(fileName: ".env");
-  runApp(const FarmersApp());
+  runApp( FarmersApp(cameras: cameras,));
 }
 
 class FarmersApp extends StatelessWidget {
-  const FarmersApp({super.key});
+    final List<CameraDescription> cameras;
+    FarmersApp({Key? key, required this.cameras}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -21,14 +27,16 @@ class FarmersApp extends StatelessWidget {
         primarySwatch: Colors.blue,
         textTheme: GoogleFonts.poppinsTextTheme(),
       ),
-      home: const HomePage(),
+      home:  HomePage(cameras: cameras,),
       debugShowCheckedModeBanner: false,
     );
   }
 }
 
 class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+  final List<CameraDescription> cameras;
+  HomePage({Key? key, required this.cameras}) : super(key: key);
+
 
   @override
   _HomePageState createState() => _HomePageState();
@@ -37,12 +45,19 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   int _selectedIndex = 0;
 
-  final List<Widget> _pages = [
-    const HomeScreen(),
-    const Center(child: Text("Market Page", style: TextStyle(fontSize: 18))),
-    const ProfilePage(),
-    const ChatbotPage(),
-  ];
+  late List<Widget> _pages;
+
+  @override
+  void initState() {
+    super.initState();
+    _pages = [
+      const HomeScreen(),
+      const Center(child: Text("Market Page", style: TextStyle(fontSize: 18))),
+      const ProfilePage(),
+      const ChatbotPage(),
+      DiseaseDetectionPage(cameras: widget.cameras), // 👈 New Page Added
+    ];
+  }
 
   void _onItemTapped(int index) {
     setState(() {
@@ -67,6 +82,8 @@ class _HomePageState extends State<HomePage> {
           BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile"),
           BottomNavigationBarItem(
               icon: Icon(Icons.support_agent), label: "Chatbot"),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.healing), label: "Disease"), // 👈 New Item
         ],
       ),
     );
@@ -90,7 +107,7 @@ class HomeScreen extends StatelessWidget {
           Opacity(
             opacity: 0.4,
             child: Image.asset(
-              'assets/images.jpg',
+              'assets/images.png',
               fit: BoxFit.cover,
               width: double.infinity,
               height: double.infinity,
@@ -104,7 +121,7 @@ class HomeScreen extends StatelessWidget {
                 children: [
                   _buildWeatherSection(),
                   const SizedBox(height: 20),
-                  _buildQuickActions(),
+                  _buildQuickActions(context),
                   const SizedBox(height: 20),
                   _buildInfoCard(
                       "🌱 Sustainable Farming",
@@ -145,7 +162,7 @@ class HomeScreen extends StatelessWidget {
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                       color: Colors.white)),
-              Text("☀️  28°C  |  Clear Sky",
+              Text("☀  28°C  |  Clear Sky",
                   style: TextStyle(fontSize: 16, color: Colors.white70)),
             ],
           ),
@@ -155,7 +172,7 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildQuickActions() {
+  Widget _buildQuickActions(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -166,18 +183,32 @@ class HomeScreen extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
             _buildActionButton(
-                Icons.shopping_cart, "Market Prices", Colors.red),
-            _buildActionButton(Icons.cloud, "Weather", Colors.blue),
+                icon: Icons.shopping_cart, label: "Market Prices", color: Colors.red, onTap: () {
+                  print("clicked");
+                }),
+            _buildActionButton(icon:  Icons.cloud, label: "Weather",color:  Colors.blue, onTap: () {
+                  _navigateToWeatherScreen(context);
+                }),
             _buildActionButton(
-                Icons.lightbulb, "Farming Advice", Colors.yellow[800]!),
+                icon: Icons.lightbulb,label:  "Farming Advice",color:  Colors.yellow[800]!, onTap: () {
+                  print("clicked");
+                }),
           ],
         ),
       ],
     );
   }
 
-  Widget _buildActionButton(IconData icon, String label, Color color) {
-    return Column(
+Widget _buildActionButton({
+  required IconData icon,
+  required String label,
+  required Color color,
+  required VoidCallback onTap,
+}) {
+  return GestureDetector(
+    onTap: onTap,
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
         CircleAvatar(
           radius: 30,
@@ -185,10 +216,28 @@ class HomeScreen extends StatelessWidget {
           child: Icon(icon, size: 30, color: color),
         ),
         const SizedBox(height: 5),
-        Text(label, textAlign: TextAlign.center),
+        Text(
+          label, 
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: Colors.grey[800],
+            fontWeight: FontWeight.w500,
+          ),
+        ),
       ],
-    );
-  }
+    ),
+  );
+}
+void _navigateToWeatherScreen(BuildContext context) async {
+  final result = await Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) => const WeatherScreen(),
+    ),
+  );
+  
+
+}
 
   Widget _buildInfoCard(String title, String description, Color color) {
     return Container(
